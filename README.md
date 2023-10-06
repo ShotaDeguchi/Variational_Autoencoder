@@ -1,3 +1,5 @@
 # VAE
-# VAE
-# Variational_Autoencoder
+
+VAE (Variational Autoencoder) implementation in PyTorch. 
+
+

@@ -4,24 +4,26 @@ model implementation
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class VariationalAutoencoder(nn.Module):
-    def __init__(self, f_in=784, f_hid=512, f_out=20):
+    def __init__(self, f_in=784, f_out=2):
         super().__init__()
 
         # encoder
-        self.fc1 = nn.Linear(f_in, f_hid)
-        self.fc_mu = nn.Linear(f_hid, f_out)   # mu
-        self.fc_sigma = nn.Linear(f_hid, f_out)    # sigma
+        self.fc_enc1 = nn.Linear(f_in, 256)
+        self.fc_enc2 = nn.Linear(256, 64)
+        self.fc_mu = nn.Linear(64, f_out)
+        self.fc_sigma = nn.Linear(64, f_out)
 
         # decoder
-        self.fc2 = nn.Linear(f_out, f_hid)
-        self.fc3 = nn.Linear(f_hid, f_in)
+        self.fc_dec1 = nn.Linear(f_out, 64)
+        self.fc_dec2 = nn.Linear(64, 256)
+        self.fc_dec3 = nn.Linear(256, f_in)
 
     def encode(self, x):
-        x = F.relu(self.fc1(x))
+        x = nn.ReLU()(self.fc_enc1(x))
+        x = nn.ReLU()(self.fc_enc2(x))
         mu = self.fc_mu(x)
         sigma = self.fc_sigma(x)
         return mu, sigma
@@ -32,8 +34,9 @@ class VariationalAutoencoder(nn.Module):
         return mu + eps * std
 
     def decode(self, z):
-        z = F.relu(self.fc2(z))
-        z = torch.sigmoid(self.fc3(z))
+        z = nn.ReLU()(self.fc_dec1(z))
+        z = nn.ReLU()(self.fc_dec2(z))
+        z = torch.sigmoid(self.fc_dec3(z))
         return z
 
     def forward(self, x):
@@ -42,5 +45,3 @@ class VariationalAutoencoder(nn.Module):
         z = self.reparameterize(mu, sigma)
         y = self.decode(z)
         return y, mu, sigma
-
-

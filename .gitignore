@@ -3,4 +3,5 @@
 __pycache__/
 data/
 checkpoints/
-results/
+results_train/
+results_infer/

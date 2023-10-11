@@ -38,9 +38,6 @@ def train_step(
         # put data on target device
         X, _ = X.to(device), _.to(device)
 
-        # zero the parameter gradients
-        optimizer.zero_grad()
-
         # forward pass
         X_, mu_, sigma_ = model(X)
 
@@ -49,6 +46,9 @@ def train_step(
         train_loss += loss.item()
         # acc = accuracy_fn(y_hat, y)
         # train_acc += acc.item()
+
+        # zero the parameter gradients
+        optimizer.zero_grad()
 
         # backward pass
         loss.backward()

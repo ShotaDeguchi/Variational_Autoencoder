@@ -24,24 +24,21 @@ import train_utils
 from models import *
 from train_utils import *
 
+################################################################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--f_out", type=int, default=2)
 parser.add_argument("-b", "--batch_size", type=int, default=1024)
-parser.add_argument("-e", "--epochs", type=int, default=30)
 parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
+parser.add_argument("-e", "--epochs", type=int, default=30)
 parser.add_argument("-p", "--patience", type=int, default=10)
 parser.add_argument("-d", "--device", type=str, default="mps")
 parser.add_argument("-s", "--seed", type=int, default=42)
+args = parser.parse_args()
 
+################################################################################
 
 def main():
-    # arguments
-    args = parser.parse_args()
-
-    # plot settings
-    plot_settings()
-
     # seed
     torch.manual_seed(args.seed)
 
@@ -116,14 +113,18 @@ def main():
     hist_dict = {
         "epoch": [],
         "train_loss": [],
-        "test_loss": []
+        "train_bc_etr": [],
+        "train_kl_div": [],
+        "test_loss": [],
+        "test_bc_etr": [],
+        "test_kl_div": [],
     }
     wait = 0
     best_loss = np.inf
     t0 = time.perf_counter()
     for epoch in range(0, args.epochs+1):
         # train step
-        train_loss, _ = train_step(
+        train_loss, train_bc_etr, train_kl_div, _ = train_step(
             model=model,
             dataloader=train_dataloader,
             optimizer=optimizer,
@@ -133,7 +134,7 @@ def main():
         )
 
         # test step
-        test_loss, _ = test_step(
+        test_loss, test_bc_etr, test_kl_div, _ = test_step(
             model=model,
             dataloader=test_dataloader,
             loss_fn=loss_fn,
@@ -144,7 +145,12 @@ def main():
         # add to history
         hist_dict["epoch"].append(epoch)
         hist_dict["train_loss"].append(train_loss)
+        hist_dict["train_bc_etr"].append(train_bc_etr)
+        hist_dict["train_kl_div"].append(train_kl_div)
+
         hist_dict["test_loss"].append(test_loss)
+        hist_dict["test_bc_etr"].append(test_bc_etr)
+        hist_dict["test_kl_div"].append(test_kl_div)
 
         # early stopping
         if test_loss < best_loss:
@@ -160,11 +166,11 @@ def main():
         t1 = time.perf_counter()
         elps = t1 - t0
         log = f"epoch: {epoch}/{args.epochs}, " \
-                f"train_loss: {train_loss:.4f}, " \
-                f"test_loss: {test_loss:.4f}, " \
-                f"best_loss: {best_loss:.4f}, " \
+                f"train_loss: {train_loss:.3f}, " \
+                f"test_loss: {test_loss:.3f}, " \
+                f"best_loss: {best_loss:.3f}, " \
                 f"wait: {wait}/{args.patience}, " \
-                f"elapsed: {elps:.2f}s"
+                f"elps: {elps:.3f}s"
         print(log)
 
         # reconstruct images
@@ -217,33 +223,49 @@ def main():
             images, labels = images.cpu(), labels.cpu()
 
             # plot
-            plt.figure(figsize=(6, 6))
+            fig, ax = plt.subplots(figsize=(5, 5))
             for i in range(10):
-                plt.scatter(z[labels==i, 0], z[labels==i, 1], label=str(i), alpha=.7)
-                plt.annotate(str(i), (z[labels==i, 0].mean(), z[labels==i, 1].mean()), bbox=dict(boxstyle="round", fc="w", ec="k", alpha=.7))
-            plt.legend(loc="upper right")
-            plt.xlim(-5., 5.)
-            plt.ylim(-5., 5.)
-            plt.xlabel(r"$z_1$")
-            plt.ylabel(r"$z_2$")
-            plt.title(f"2D embedding of the latent space at epoch: {epoch}")
-            plt.grid(alpha=.5)
-            plt.tight_layout()
-            plt.savefig(path_results_train / f"embedding_{epoch}.png")
-            plt.close()
+                ax.scatter(z[labels==i, 0], z[labels==i, 1], label=str(i), marker="o", alpha=.7)
+                ax.annotate(
+                    str(i), (z[labels==i, 0].mean(), z[labels==i, 1].mean()),
+                    bbox=dict(boxstyle="round", fc="w", ec="k", alpha=.7)
+                )
+            ax.legend(loc="upper left")
+            ax.set(
+                xlim=(-7., 7.),
+                ylim=(-7., 7.),
+                xlabel=r"$z_1$",
+                ylabel=r"$z_2$",
+                title=f"2D embedding of the latent space at epoch: {epoch}",
+            )
+            fig.tight_layout()
+            fig.savefig(path_results_train / f"embedding_{epoch}.png")
+            plt.close(fig)
 
 
-    # training history
-    plt.figure(figsize=(7, 5))
-    plt.plot(hist_dict["epoch"], hist_dict["train_loss"], label="train_loss")
-    plt.plot(hist_dict["epoch"], hist_dict["test_loss"], label="test_loss")
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.yscale("log")
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(path_results_train / "history.png")
-    plt.close()
+    # history
+    nrows, ncols = 2, 1
+    fig, ax = plt.subplots(2, 1, figsize=(7, 10))
+
+    ax[0].plot(hist_dict["epoch"], hist_dict["train_loss"], c="b", label="train_loss")
+    ax[0].plot(hist_dict["epoch"], hist_dict["test_loss"],  c="r", label="test_loss")
+
+    ax[1].plot(hist_dict["epoch"], hist_dict["train_bc_etr"], ls="--", c="b", label="train_bc_etr")
+    ax[1].plot(hist_dict["epoch"], hist_dict["train_kl_div"], ls="-.", c="b", label="train_kl_div")
+    ax[1].plot(hist_dict["epoch"], hist_dict["test_bc_etr"],  ls="--", c="r", label="test_bc_etr")
+    ax[1].plot(hist_dict["epoch"], hist_dict["test_kl_div"],  ls="-.", c="r", label="test_kl_div")
+
+    for i in range(nrows):
+        ax[i].legend(loc="best")
+        ax[i].set(
+            yscale="log",
+            xlabel=r"Epochs",
+            ylabel=r"$\mathcal{L}$",
+        )
+    fig.tight_layout()
+    fig.savefig(path_results_train / "history.png")
+    plt.close(fig)
+
 
     # save the model
     torch.save(
@@ -251,15 +273,26 @@ def main():
         path_checkpoints / "model.pt"
     )
 
+################################################################################
 
 def plot_settings():
-    plt.rcParams["figure.figsize"] = (7, 5)
-    plt.rcParams["font.family"] = "Times New Roman"
-    plt.rcParams["font.size"] = 12
+    plt.style.use("default")
+    # plt.style.use("seaborn-v0_8-deep")
+    plt.style.use("seaborn-v0_8-talk")   # paper / notebook / talk / poster
+    # plt.style.use("classic")
+    plt.rcParams["font.family"] = "STIXGeneral"
     plt.rcParams["mathtext.fontset"] = "cm"
-    plt.rcParams["legend.framealpha"] = 1.
+    plt.rcParams["figure.figsize"] = (7, 5)
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["axes.grid"] = True
+    plt.rcParams['axes.axisbelow'] = True   # background grid
+    plt.rcParams["grid.alpha"] = .3
+    plt.rcParams["legend.framealpha"] = .8
+    plt.rcParams["legend.facecolor"] = "w"
     plt.rcParams["savefig.dpi"] = 300
 
+################################################################################
 
 if __name__ == "__main__":
+    plot_settings()
     main()

@@ -9,9 +9,10 @@ from torch.nn import functional as F
 
 
 def loss_fn(recon_x, x, mu, sigma):
-    BCE = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction="sum")
-    KLD = -0.5 * torch.sum(1 + sigma - mu.pow(2) - sigma.exp())
-    return BCE + KLD
+    bc_etr = F.binary_cross_entropy(recon_x, x.view(-1, 784), reduction="sum")
+    kl_div = -0.5 * torch.sum(1 + sigma - mu.pow(2) - sigma.exp())
+    loss = bc_etr + kl_div
+    return loss, bc_etr, kl_div
 
 
 def accuracy_fn(y_true, y_pred):
@@ -31,6 +32,8 @@ def train_step(
 
     # loss and accuracy
     train_loss = 0.
+    train_bc_etr = 0.
+    train_kl_div = 0.
     train_acc = 0.
 
     # iterate over given dataloader
@@ -42,8 +45,10 @@ def train_step(
         X_, mu_, sigma_ = model(X)
 
         # loss & accuracy computation
-        loss = loss_fn(X_, X, mu_, sigma_)
+        loss, bc_etr, kl_div = loss_fn(X_, X, mu_, sigma_)
         train_loss += loss.item()
+        train_bc_etr += bc_etr.item()
+        train_kl_div += kl_div.item()
         # acc = accuracy_fn(y_hat, y)
         # train_acc += acc.item()
 
@@ -63,9 +68,11 @@ def train_step(
 
     # compute the loss and accuracy for this epoch
     train_loss /= len(dataloader)
+    train_bc_etr /= len(dataloader)
+    train_kl_div /= len(dataloader)
     train_acc /= len(dataloader)
 
-    return train_loss, train_acc
+    return train_loss, train_bc_etr, train_kl_div, train_acc
 
 
 def test_step(
@@ -80,6 +87,8 @@ def test_step(
 
     # loss and accuracy
     test_loss = 0.
+    test_bc_etr = 0.
+    test_kl_div = 0.
     test_acc = 0.
 
     # inference mode
@@ -93,8 +102,10 @@ def test_step(
             X_, mu_, sigma_ = model(X)
 
             # loss & accuracy computation
-            loss = loss_fn(X_, X, mu_, sigma_)
+            loss, bc_etr, kl_div = loss_fn(X_, X, mu_, sigma_)
             test_loss += loss.item()
+            test_bc_etr += bc_etr.item()
+            test_kl_div += kl_div.item()
             # acc = accuracy_fn(y_hat, y)
             # test_acc += acc.item()
 
@@ -105,9 +116,11 @@ def test_step(
 
     # compute the loss and accuracy for this epoch
     test_loss /= len(dataloader)
+    test_bc_etr /= len(dataloader)
+    test_kl_div /= len(dataloader)
     test_acc /= len(dataloader)
 
-    return test_loss, test_acc
+    return test_loss, test_bc_etr, test_kl_div, test_acc
 
 
 def train(
@@ -176,5 +189,3 @@ def train(
         print(log)
 
     return hist_dict
-
-

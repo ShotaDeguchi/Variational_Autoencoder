@@ -24,24 +24,21 @@ import train_utils
 from models import *
 from train_utils import *
 
+################################################################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-f", "--f_out", type=int, default=2)
-parser.add_argument("-b", "--batch_size", type=int, default=1024)
+parser.add_argument("-b", "--batch_size", type=int, default=256)
 parser.add_argument("-e", "--epochs", type=int, default=100)
 parser.add_argument("-lr", "--learning_rate", type=float, default=1e-3)
 parser.add_argument("-p", "--patience", type=int, default=10)
 parser.add_argument("-d", "--device", type=str, default="cpu")
 parser.add_argument("-s", "--seed", type=int, default=42)
+args = parser.parse_args()
 
+################################################################################
 
 def main():
-    # arguments
-    args = parser.parse_args()
-
-    # plot settings
-    plot_settings()
-
     # seed
     torch.manual_seed(args.seed)
 
@@ -143,15 +140,26 @@ def main():
             y = y.view(-1, 1, 28, 28)
             save_image(y, path_results_infer / f"sweep_along_z2_{i}.png", nrow=z_n)
 
+################################################################################
 
 def plot_settings():
-    plt.rcParams["figure.figsize"] = (7, 5)
-    plt.rcParams["font.family"] = "Times New Roman"
-    plt.rcParams["font.size"] = 12
+    plt.style.use("default")
+    # plt.style.use("seaborn-v0_8-deep")
+    plt.style.use("seaborn-v0_8-talk")   # paper / notebook / talk / poster
+    # plt.style.use("classic")
+    plt.rcParams["font.family"] = "STIXGeneral"
     plt.rcParams["mathtext.fontset"] = "cm"
-    plt.rcParams["legend.framealpha"] = 1.
+    plt.rcParams["figure.figsize"] = (7, 5)
+    plt.rcParams["figure.autolayout"] = True
+    plt.rcParams["axes.grid"] = True
+    plt.rcParams['axes.axisbelow'] = True   # background grid
+    plt.rcParams["grid.alpha"] = .3
+    plt.rcParams["legend.framealpha"] = .8
+    plt.rcParams["legend.facecolor"] = "w"
     plt.rcParams["savefig.dpi"] = 300
 
+################################################################################
 
 if __name__ == "__main__":
+    plot_settings()
     main()
